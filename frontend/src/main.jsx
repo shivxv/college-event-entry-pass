@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { CalendarDays, CheckCircle2, ChevronRight, Download, IdCard, LockKeyhole, Printer, QrCode, Search, ShieldCheck, Ticket, UserRound, UsersRound, XCircle } from 'lucide-react';
 import './styles.css';
 
-const API = import.meta.env.VITE_API_URL || '';
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'https://college-event-entry-pass.onrender.com');
 const api = async (path, options = {}) => {
   const response = await fetch(`${API}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
   const data = await response.json().catch(() => ({}));
