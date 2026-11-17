@@ -32,7 +32,7 @@ export async function requireStaff(req, res, next) {
   } catch {
     return res.status(401).json({ message: 'The staff session is invalid or expired.' });
   }
-  if (typeof payload.sub !== 'string' || !['admin', 'volunteer'].includes(payload.role)) {
+  if (typeof payload.sub !== 'string' || payload.role !== 'admin') {
     return res.status(401).json({ message: 'The staff session is invalid or expired.' });
   }
 

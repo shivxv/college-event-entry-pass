@@ -8,7 +8,7 @@ const staffUserSchema = new mongoose.Schema(
     passwordResetTokenHash: { type: String, select: false },
     passwordResetExpiresAt: { type: Date, select: false },
     tokenVersion: { type: Number, required: true, default: 0 },
-    role: { type: String, required: true, enum: ['admin', 'volunteer'] },
+    role: { type: String, required: true, enum: ['admin'] },
     active: { type: Boolean, required: true, default: true },
   },
   { timestamps: true, versionKey: false },

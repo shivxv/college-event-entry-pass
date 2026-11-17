@@ -15,7 +15,7 @@ There is no online payment gateway. Fees are collected and verified offline at t
 - Atomic offline payment approval and generation of a 256-bit pass token
 - Public **Get My Pass** lookup using college ID plus registered phone
 - Printable and downloadable paid passes with QR codes
-- JWT-authenticated mobile gate scanner for admins and volunteers
+- JWT-authenticated gate scanner for the administrator
 - Atomic first-entry protection: `ENTRY ALLOWED`, `ENTRY ALREADY USED`, or `INVALID PASS — ENTRY DENIED`
 
 ## Requirements
@@ -125,11 +125,11 @@ The bootstrap endpoint is protected by `BOOTSTRAP_ADMIN_TOKEN` and can create th
 Invoke-RestMethod -Uri http://localhost:5000/api/auth/bootstrap-admin -Method Post -ContentType 'application/json' -Body '{"bootstrapToken":"YOUR_BOOTSTRAP_ADMIN_TOKEN","username":"admin","email":"admin@example.com","password":"a-long-private-password"}'
 ```
 
-The username may contain letters, numbers, spaces, dots, underscores, and hyphens. Provide a working staff email address and a password of at least 12 characters. Remove the bootstrap token setting after this succeeds.
+Use the administrator's name as the username, a working recovery email address, and a password of at least 12 characters. Remove the bootstrap token setting after creating the account.
 
-Then sign in through **Staff access** in the website. Admins can invite staff from the dashboard by name and email; each staff member receives a link to choose their own password. Staff can update their recovery email and change their password while signed in.
+Then sign in through **Staff access** in the website. Only this administrator account can sign in. The administrator can update the recovery email and change the password while signed in.
 
-Configure these private variables in Render to enable invitations and password-reset emails:
+Configure these private variables in Render to enable administrator password-reset emails:
 
 ```dotenv
 SMTP_HOST=
@@ -140,23 +140,23 @@ SMTP_PASS=
 SMTP_FROM=
 ```
 
-Use the SMTP credentials issued by your email provider. Keep them private and configure them in Render's environment settings, not in source control. Staff can select **Forgot password?** on the login screen and receive a single-use reset link at their registered email. Until SMTP is configured, password resets and staff invitations are unavailable.
+Use the SMTP credentials issued by your email provider. Keep them private and configure them in Render's environment settings, not in source control. The administrator can select **Forgot password?** on the login screen and receive a single-use reset link at the account's recovery email. Until SMTP is configured, password resets are unavailable.
 
-Signed-in staff can choose **Change password** from the staff navigation. The current password is required, and the new password must be at least 12 characters.
+The signed-in administrator can choose **Change password** from the navigation. The current password is required, and the new password must be at least 12 characters.
 
 ## Student workflow
 
 1. A student registers through the public registration form.
 2. The registration defaults to `paymentStatus: pending` and its entry state remains unentered.
-3. Staff collect the fee at the college counter and use the admin dashboard to mark the student paid.
+3. The administrator collects the fee at the college counter and uses the dashboard to mark the student paid.
 4. Payment approval atomically creates one cryptographically random pass token and unlocks the pass.
 5. The student opens **Get my pass**, enters the college ID and registered phone, and downloads or prints the pass.
 
 ## Gate workflow
 
-1. A volunteer signs in through **Staff access**.
-2. The volunteer opens the gate scanner and permits camera access.
-3. The scanned pass is sent with the volunteer JWT to the backend.
+1. The administrator signs in through **Staff access**.
+2. The administrator opens the gate scanner and permits camera access.
+3. The scanned pass is sent with the administrator JWT to the backend.
 4. The API atomically changes an unpaid, unknown, or already-used pass into the appropriate result:
    - Valid first scan: `ENTRY ALLOWED`
    - Used pass: `ENTRY ALREADY USED`
@@ -166,18 +166,17 @@ Signed-in staff can choose **Change password** from the staff navigation. The cu
 
 - `POST /api/registrations` — public student registration
 - `POST /api/passes/my-pass` — public paid-pass lookup
-- `POST /api/auth/login` — admin or volunteer JWT login
-- `POST /api/auth/change-password` — change the authenticated staff member's password
-- `POST /api/auth/email` — update the authenticated staff member's recovery email
+- `POST /api/auth/login` — administrator JWT login
+- `POST /api/auth/change-password` — change the administrator password
+- `POST /api/auth/email` — update the administrator recovery email
 - `POST /api/auth/forgot-password` — request a password-reset email
 - `POST /api/auth/reset-password` — set a password using a single-use reset token
 - `POST /api/auth/bootstrap-admin` — one-time initial admin creation
 - `GET /api/admin/students` — authenticated admin registration list/search/filter
 - `POST /api/admin/students/approve-payment` — authenticated offline payment approval
-- `POST /api/admin/volunteers` — authenticated admin volunteer creation
 - `POST /api/gate/verify` — authenticated atomic pass check-in
 
-Admin and volunteer requests require `Authorization: Bearer <JWT>`.
+Administrator requests require `Authorization: Bearer <JWT>`.
 
 ## Security notes
 

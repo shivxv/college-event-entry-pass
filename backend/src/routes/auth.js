@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { rateLimit } from 'express-rate-limit';
 import StaffUser from '../models/StaffUser.js';
 import { getJwtSecret, requireStaff, signStaffToken } from '../middleware/staffAuth.js';
-import { sendStaffPasswordEmail } from '../services/mailer.js';
+import { sendAdminPasswordResetEmail } from '../services/mailer.js';
 
 const router = Router();
 const loginLimiter = rateLimit({
@@ -89,7 +89,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     if (!validUsername(username) || !validPassword(password)) {
       return res.status(400).json({ message: 'Enter a valid username and password.' });
     }
-    const user = await StaffUser.findOne({ username: normalizeUsername(username) })
+    const user = await StaffUser.findOne({ username: normalizeUsername(username), role: 'admin' })
       .select('+passwordHash _id username role active tokenVersion');
     const passwordMatches = await bcrypt.compare(password, user?.passwordHash || DUMMY_PASSWORD_HASH);
     if (!user || !user.active || !passwordMatches) {
@@ -167,7 +167,7 @@ router.post('/forgot-password', resetRequestLimiter, async (req, res, next) => {
       return res.status(503).json({ message: 'Password reset email is not configured. Contact the administrator.' });
     }
 
-    const user = await StaffUser.findOne({ email: normalizeEmail(email), active: true });
+    const user = await StaffUser.findOne({ email: normalizeEmail(email), role: 'admin', active: true });
     if (user) {
       const token = randomBytes(32).toString('hex');
       user.passwordResetTokenHash = hashResetToken(token);
@@ -175,14 +175,13 @@ router.post('/forgot-password', resetRequestLimiter, async (req, res, next) => {
       await user.save();
       const resetUrl = new URL('/', origin);
       resetUrl.hash = `reset-password?token=${token}`;
-      await sendStaffPasswordEmail({
+      await sendAdminPasswordResetEmail({
         to: user.email,
         username: user.username,
         resetUrl: resetUrl.toString(),
-        purpose: 'reset',
       });
     }
-    return res.json({ message: 'If that staff email is registered, a password reset link will arrive shortly.' });
+    return res.json({ message: 'If that administrator recovery email is registered, a password reset link will arrive shortly.' });
   } catch (error) {
     return next(error);
   }
@@ -198,7 +197,7 @@ router.post('/reset-password', resetSubmitLimiter, async (req, res, next) => {
     }
 
     const user = await StaffUser.findOneAndUpdate(
-      { passwordResetTokenHash: hashResetToken(token), passwordResetExpiresAt: { $gt: new Date() }, active: true },
+      { passwordResetTokenHash: hashResetToken(token), passwordResetExpiresAt: { $gt: new Date() }, role: 'admin', active: true },
       {
         $set: { passwordHash: await bcrypt.hash(newPassword, 12) },
         $inc: { tokenVersion: 1 },
