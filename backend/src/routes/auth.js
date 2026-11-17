@@ -3,7 +3,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { rateLimit } from 'express-rate-limit';
 import StaffUser from '../models/StaffUser.js';
-import { getJwtSecret, signStaffToken } from '../middleware/staffAuth.js';
+import { getJwtSecret, requireStaff, signStaffToken } from '../middleware/staffAuth.js';
 
 const router = Router();
 const loginLimiter = rateLimit({
@@ -19,6 +19,12 @@ const bootstrapLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { message: 'Too many bootstrap attempts. Please try again later.' },
+});
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
 });
 
 router.post('/bootstrap-admin', bootstrapLimiter, async (req, res, next) => {
@@ -81,6 +87,30 @@ router.post('/login', loginLimiter, async (req, res, next) => {
       expiresIn: 28800,
       user: { username: user.username, role: user.role },
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/change-password', passwordChangeLimiter, requireStaff, async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    const { currentPassword, newPassword } = req.body ?? {};
+    if (!hasOnlyKeys(req.body, ['currentPassword', 'newPassword']) ||
+      !validPassword(currentPassword) || !validPassword(newPassword)) {
+      return res.status(400).json({ message: 'Enter your current password and a new password of at least 12 characters.' });
+    }
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ message: 'Choose a new password different from your current password.' });
+    }
+
+    const user = await StaffUser.findById(req.staff.id).select('+passwordHash _id');
+    if (!user || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      return res.status(401).json({ message: 'The current password is incorrect.' });
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    await user.save();
+    return res.json({ message: 'Password changed successfully.' });
   } catch (error) {
     return next(error);
   }

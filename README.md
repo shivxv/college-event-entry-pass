@@ -129,6 +129,8 @@ The username may contain letters, numbers, dots, underscores, and hyphens. Passw
 
 Then sign in through **Staff access** in the website. Admin accounts can create volunteer accounts with `POST /api/admin/volunteers` or extend the dashboard with that account-management action. Volunteers sign in through the same staff login.
 
+Signed-in staff can choose **Change password** from the staff navigation. The current password is required, and the new password must be at least 12 characters.
+
 ## Student workflow
 
 1. A student registers through the public registration form.
@@ -152,6 +154,7 @@ Then sign in through **Staff access** in the website. Admin accounts can create 
 - `POST /api/registrations` — public student registration
 - `POST /api/passes/my-pass` — public paid-pass lookup
 - `POST /api/auth/login` — admin or volunteer JWT login
+- `POST /api/auth/change-password` — change the authenticated staff member's password
 - `POST /api/auth/bootstrap-admin` — one-time initial admin creation
 - `GET /api/admin/students` — authenticated admin registration list/search/filter
 - `POST /api/admin/students/approve-payment` — authenticated offline payment approval

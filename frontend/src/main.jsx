@@ -14,7 +14,7 @@ const eventName = (type) => type === 'farewell' ? 'Farewell Party' : 'Fresher’
 
 function Logo() { return <div className="logo"><span><Ticket size={19}/></span><b>campus<strong>gather</strong></b></div>; }
 function Shell({ page, setPage, children, staff = false }) {
-  return <div className="site"><header><Logo/><nav>{!staff && <><button onClick={() => setPage('home')}>Events</button><button onClick={() => setPage('register')}>Register</button><button onClick={() => setPage('mypass')}>Get my pass</button></>}<button className="staff-button" onClick={() => setPage(staff ? 'home' : 'staff')}>{staff ? 'Public site' : 'Staff access'} <ChevronRight size={15}/></button></nav></header>{children}<footer><Logo/><span>Two celebrations. One campus community.</span></footer></div>;
+  return <div className="site"><header><Logo/><nav>{!staff && <><button onClick={() => setPage('home')}>Events</button><button onClick={() => setPage('register')}>Register</button><button onClick={() => setPage('mypass')}>Get my pass</button></>}{staff&&<button onClick={()=>setPage('change-password')}>Change password</button>}<button className="staff-button" onClick={() => setPage(staff ? 'home' : 'staff')}>{staff ? 'Public site' : 'Staff access'} <ChevronRight size={15}/></button></nav></header>{children}<footer><Logo/><span>Two celebrations. One campus community.</span></footer></div>;
 }
 function Home({ setPage }) {
   const [date, setDate] = useState('');
@@ -45,7 +45,29 @@ function Staff({ setPage }) {
   const login=async(e)=>{e.preventDefault();setError('');try{const data=await api('/api/auth/login',{method:'POST',body:JSON.stringify(credentials)});setToken(data.token);setRole(data.user.role);sessionStorage.setItem('staffToken',data.token);sessionStorage.setItem('staffRole',data.user.role);}catch(e){setError(e.message);}};
   const logout=()=>{sessionStorage.clear();setToken('');setRole('');};
   if(!token) return <Shell page="staff" setPage={setPage}><main className="login-page"><form className="login-card" onSubmit={login}><div className="login-icon"><LockKeyhole/></div><span className="section-number">AUTHORISED STAFF</span><h1>Staff sign in</h1><p>Admins and gate volunteers use separate authorised accounts.</p>{error&&<div className="notice danger"><XCircle/> {error}</div>}<TextField label="Username" value={credentials.username} set={(v)=>setCredentials({...credentials,username:v})}/><TextField label="Password" type="password" value={credentials.password} set={(v)=>setCredentials({...credentials,password:v})}/><button className="primary full">Sign in <ChevronRight/></button></form></main></Shell>;
+  if(location.hash.slice(1)==='change-password') return <PasswordChange token={token} logout={logout} setPage={setPage}/>;
   return role==='admin' ? <Admin token={token} logout={logout} setPage={setPage}/> : <Scanner token={token} logout={logout} setPage={setPage}/>;
+}
+function PasswordChange({token,logout,setPage}) {
+  const [values,setValues]=useState({currentPassword:'',newPassword:'',confirmPassword:''});
+  const [message,setMessage]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const update=(key,value)=>setValues({...values,[key]:value});
+  const submit=async(e)=>{
+    e.preventDefault();
+    setMessage(null);
+    if(values.newPassword!==values.confirmPassword){setMessage({ok:false,text:'The new passwords do not match.'});return;}
+    setBusy(true);
+    try {
+      const result=await api('/api/auth/change-password',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:JSON.stringify({currentPassword:values.currentPassword,newPassword:values.newPassword})});
+      setMessage({ok:true,text:result.message});
+    } catch(error) {
+      setMessage({ok:false,text:error.message});
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <Shell staff page="change-password" setPage={setPage}><main className="login-page"><form className="login-card" onSubmit={submit}><div className="login-icon"><LockKeyhole/></div><span className="section-number">STAFF ACCOUNT</span><h1>Change password</h1><p>Enter your current password and choose a new password with at least 12 characters.</p>{message&&<div className={`notice ${message.ok?'success':'danger'}`}>{message.text}</div>}{!message?.ok&&<><TextField label="Current password" type="password" value={values.currentPassword} set={(v)=>update('currentPassword',v)}/><TextField label="New password" type="password" value={values.newPassword} set={(v)=>update('newPassword',v)}/><TextField label="Confirm new password" type="password" value={values.confirmPassword} set={(v)=>update('confirmPassword',v)}/></>}{message?.ok?<button type="button" className="primary full" onClick={()=>{logout();setPage('staff');}}>Return to staff sign in</button>:<button className="primary full" disabled={busy}>{busy?'Updating…':'Update password'}<ChevronRight/></button>}</form></main></Shell>;
 }
 function Admin({token,logout,setPage}) {
   const [students,setStudents]=useState([]),[search,setSearch]=useState(''),[payment,setPayment]=useState(''),[event,setEvent]=useState(''),[message,setMessage]=useState(null);
@@ -62,5 +84,5 @@ function Scanner({token,logout,setPage}) {
   return <Shell staff page="staff" setPage={setPage}><main className="scanner-page"><div className="scanner-head"><div><span>AUTHORIZED VOLUNTEER</span><h1>Gate scanner</h1></div><button className="secondary" onClick={logout}>Sign out</button></div><div className="scanner-grid"><section className="camera"><div id="gate-reader"/><p>{readerReady?'Camera ready — align the QR code':'Allow camera access to begin scanning.'}</p></section><section className="result-panel"><span className="status-kicker">LATEST SCAN</span>{pinResult?<div className={`gate-result ${pinResult.ok?'allowed':'denied'}`}>{pinResult.ok?<CheckCircle2/>:<XCircle/>}<h2>{pinResult.title}</h2>{pinResult.detail&&<p>{pinResult.detail}</p>}</div>:<div className="gate-result idle"><QrCode/><h2>Awaiting pass</h2><p>Scan a student’s secure QR code.</p></div>}<form onSubmit={manualVerify}><label>Manual pass token<input value={manual} onChange={e=>setManual(e.target.value)} placeholder="Pass token or verification URL"/></label><button className="primary full" disabled={!roleReady}>Verify pass</button></form></section></div></main></Shell>;
 }
 
-function App(){const [page,setPage]=useState(location.hash.slice(1)||'home');useEffect(()=>{const update=()=>setPage(location.hash.slice(1)||'home');window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);const go=(next)=>{location.hash=next;setPage(next);};if(page==='staff'||page==='scanner')return<Staff setPage={go}/>;if(page==='register')return<Shell page={page} setPage={go}><Register setPage={go}/></Shell>;if(page==='mypass')return<Shell page={page} setPage={go}><MyPass/></Shell>;return<Shell page={page} setPage={go}><Home setPage={go}/></Shell>;}
+function App(){const [page,setPage]=useState(location.hash.slice(1)||'home');useEffect(()=>{const update=()=>setPage(location.hash.slice(1)||'home');window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);const go=(next)=>{location.hash=next;setPage(next);};if(page==='staff'||page==='scanner'||page==='change-password')return<Staff setPage={go}/>;if(page==='register')return<Shell page={page} setPage={go}><Register setPage={go}/></Shell>;if(page==='mypass')return<Shell page={page} setPage={go}><MyPass/></Shell>;return<Shell page={page} setPage={go}><Home setPage={go}/></Shell>;}
 createRoot(document.getElementById('root')).render(<App/>);
