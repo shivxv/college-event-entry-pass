@@ -44,7 +44,6 @@ function Staff({ setPage }) {
   const [token,setToken]=useState(sessionStorage.getItem('staffToken')||''); const [role,setRole]=useState(sessionStorage.getItem('staffRole')||''); const [credentials,setCredentials]=useState({username:'',password:''}); const [error,setError]=useState('');
   const login=async(e)=>{e.preventDefault();setError('');try{const data=await api('/api/auth/login',{method:'POST',body:JSON.stringify(credentials)});setToken(data.token);setRole(data.user.role);sessionStorage.setItem('staffToken',data.token);sessionStorage.setItem('staffRole',data.user.role);}catch(e){setError(e.message);}};
   const logout=()=>{sessionStorage.clear();setToken('');setRole('');};
-  if(!token&&location.hash.slice(1).startsWith('reset-password')) return <PasswordReset setPage={setPage}/>;
   if(!token&&location.hash.slice(1)==='forgot-password') return <ForgotPassword setPage={setPage}/>;
   if(!token) return <Shell page="staff" setPage={setPage}><main className="login-page"><form className="login-card" onSubmit={login}><div className="login-icon"><LockKeyhole/></div><span className="section-number">ADMINISTRATOR</span><h1>Admin sign in</h1><p>Only the administrator can sign in to verify student payments and passes.</p>{error&&<div className="notice danger"><XCircle/> {error}</div>}<TextField label="Username" value={credentials.username} set={(v)=>setCredentials({...credentials,username:v})}/><TextField label="Password" type="password" value={credentials.password} set={(v)=>setCredentials({...credentials,password:v})}/><button className="primary full">Sign in <ChevronRight/></button><button type="button" className="text-button" onClick={()=>setPage('forgot-password')}>Forgot password?</button></form></main></Shell>;
   if(location.hash.slice(1)==='change-password') return <PasswordChange token={token} logout={logout} setPage={setPage}/>;
@@ -52,38 +51,17 @@ function Staff({ setPage }) {
   return role==='admin' ? <Admin token={token} logout={logout} setPage={setPage}/> : <Scanner token={token} logout={logout} setPage={setPage}/>;
 }
 function ForgotPassword({setPage}) {
-  const [email,setEmail]=useState('');
-  const [message,setMessage]=useState(null);
-  const [busy,setBusy]=useState(false);
-  const submit=async(e)=>{
-    e.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    try {
-      const result=await api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({email})});
-      setMessage({ok:true,text:result.message});
-    } catch(error) {
-      setMessage({ok:false,text:error.message});
-    } finally {
-      setBusy(false);
-    }
-  };
-  return <Shell page="staff" setPage={setPage}><main className="login-page"><form className="login-card" onSubmit={submit}><div className="login-icon"><LockKeyhole/></div><span className="section-number">ADMINISTRATOR ACCOUNT</span><h1>Reset password</h1><p>Enter the email address linked to your staff account. We’ll send a one-time reset link.</p>{message&&<div className={`notice ${message.ok?'success':'danger'}`}>{message.text}</div>}<TextField label="Administrator recovery email" type="email" value={email} set={setEmail} placeholder="name@example.com"/><button className="primary full" disabled={busy}>{busy?'Sending…':'Send reset link'}<ChevronRight/></button><button type="button" className="text-button" onClick={()=>setPage('staff')}>Back to staff sign in</button></form></main></Shell>;
-}
-function PasswordReset({setPage}) {
-  const [values,setValues]=useState({newPassword:'',confirmPassword:''});
+  const [values,setValues]=useState({username:'',recoveryToken:'',newPassword:'',confirmPassword:''});
   const [message,setMessage]=useState(null);
   const [busy,setBusy]=useState(false);
   const update=(key,value)=>setValues({...values,[key]:value});
   const submit=async(e)=>{
     e.preventDefault();
     if(values.newPassword!==values.confirmPassword){setMessage({ok:false,text:'The new passwords do not match.'});return;}
-    const token=new URLSearchParams(location.hash.split('?')[1]||'').get('token');
-    if(!token){setMessage({ok:false,text:'This reset link is invalid. Request a new one.'});return;}
     setBusy(true);
     setMessage(null);
     try {
-      const result=await api('/api/auth/reset-password',{method:'POST',body:JSON.stringify({token,newPassword:values.newPassword})});
+      const result=await api('/api/auth/forgot-password',{method:'POST',body:JSON.stringify({username:values.username,recoveryToken:values.recoveryToken,newPassword:values.newPassword})});
       setMessage({ok:true,text:result.message});
     } catch(error) {
       setMessage({ok:false,text:error.message});
@@ -91,7 +69,7 @@ function PasswordReset({setPage}) {
       setBusy(false);
     }
   };
-  return <Shell page="staff" setPage={setPage}><main className="login-page"><form className="login-card" onSubmit={submit}><div className="login-icon"><LockKeyhole/></div><span className="section-number">ADMINISTRATOR ACCOUNT</span><h1>Choose a password</h1><p>Use at least 12 characters. Reset links can only be used once.</p>{message&&<div className={`notice ${message.ok?'success':'danger'}`}>{message.text}</div>}{!message?.ok&&<><TextField label="New password" type="password" value={values.newPassword} set={(v)=>update('newPassword',v)}/><TextField label="Confirm new password" type="password" value={values.confirmPassword} set={(v)=>update('confirmPassword',v)}/></>}{message?.ok?<button type="button" className="primary full" onClick={()=>setPage('staff')}>Go to staff sign in</button>:<button className="primary full" disabled={busy}>{busy?'Updating…':'Reset password'}<ChevronRight/></button>}</form></main></Shell>;
+  return <Shell page="staff" setPage={setPage}><main className="login-page"><form className="login-card" onSubmit={submit}><div className="login-icon"><LockKeyhole/></div><span className="section-number">ADMINISTRATOR ACCOUNT</span><h1>Manual password reset</h1><p>Enter the admin username, Render recovery token, and a new password. Keep the recovery token private.</p>{message&&<div className={`notice ${message.ok?'success':'danger'}`}>{message.text}</div>}<TextField label="Admin username" value={values.username} set={(v)=>update('username',v)} placeholder="Your admin username"/><TextField label="Manual recovery token" type="password" value={values.recoveryToken} set={(v)=>update('recoveryToken',v)} placeholder="ADMIN_RECOVERY_TOKEN from Render"/><TextField label="New password (12+ characters)" type="password" value={values.newPassword} set={(v)=>update('newPassword',v)}/><TextField label="Confirm new password" type="password" value={values.confirmPassword} set={(v)=>update('confirmPassword',v)}/><button className="primary full" disabled={busy}>{busy?'Resetting…':'Reset password'}<ChevronRight/></button><button type="button" className="text-button" onClick={()=>setPage('staff')}>Back to admin sign in</button></form></main></Shell>;
 }
 function PasswordChange({token,logout,setPage}) {
   const [values,setValues]=useState({currentPassword:'',newPassword:'',confirmPassword:''});
@@ -112,26 +90,7 @@ function PasswordChange({token,logout,setPage}) {
       setBusy(false);
     }
   };
-  return <Shell staff page="change-password" setPage={setPage}><main className="login-page"><div className="login-card"><div className="login-icon"><LockKeyhole/></div><span className="section-number">ADMINISTRATOR ACCOUNT</span><h1>Change password</h1><p>Enter your current password and choose a new password with at least 12 characters.</p>{message&&<div className={`notice ${message.ok?'success':'danger'}`}>{message.text}</div>}{!message?.ok&&<form onSubmit={submit}><TextField label="Current password" type="password" value={values.currentPassword} set={(v)=>update('currentPassword',v)}/><TextField label="New password" type="password" value={values.newPassword} set={(v)=>update('newPassword',v)}/><TextField label="Confirm new password" type="password" value={values.confirmPassword} set={(v)=>update('confirmPassword',v)}/><button className="primary full" disabled={busy}>{busy?'Updating…':'Update password'}<ChevronRight/></button></form>}<AdminRecoveryEmail token={token}/>{message?.ok&&<button type="button" className="primary full" onClick={()=>{logout();setPage('staff');}}>Return to staff sign in</button>}</div></main></Shell>;
-}
-function AdminRecoveryEmail({token}) {
-  const [values,setValues]=useState({email:'',currentPassword:''});
-  const [message,setMessage]=useState(null);
-  const [busy,setBusy]=useState(false);
-  const submit=async(e)=>{
-    e.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    try {
-      const result=await api('/api/auth/email',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(values)});
-      setMessage({ok:true,text:result.message});
-    } catch(error) {
-      setMessage({ok:false,text:error.message});
-    } finally {
-      setBusy(false);
-    }
-  };
-  return <form className="staff-email-form" onSubmit={submit}><h2>Recovery email</h2><p>Add or update the email address used for password-reset links.</p>{message&&<div className={`notice ${message.ok?'success':'danger'}`}>{message.text}</div>}<TextField label="Administrator recovery email" type="email" value={values.email} set={(v)=>setValues({...values,email:v})} placeholder="name@example.com"/><TextField label="Current password" type="password" value={values.currentPassword} set={(v)=>setValues({...values,currentPassword:v})}/><button className="primary full" disabled={busy}>{busy?'Saving…':'Save recovery email'}<ChevronRight/></button></form>;
+  return <Shell staff page="change-password" setPage={setPage}><main className="login-page"><div className="login-card"><div className="login-icon"><LockKeyhole/></div><span className="section-number">ADMINISTRATOR ACCOUNT</span><h1>Change password</h1><p>Enter your current password and choose a new password with at least 12 characters.</p>{message&&<div className={`notice ${message.ok?'success':'danger'}`}>{message.text}</div>}{!message?.ok&&<form onSubmit={submit}><TextField label="Current password" type="password" value={values.currentPassword} set={(v)=>update('currentPassword',v)}/><TextField label="New password" type="password" value={values.newPassword} set={(v)=>update('newPassword',v)}/><TextField label="Confirm new password" type="password" value={values.confirmPassword} set={(v)=>update('confirmPassword',v)}/><button className="primary full" disabled={busy}>{busy?'Updating…':'Update password'}<ChevronRight/></button></form>}{message?.ok&&<button type="button" className="primary full" onClick={()=>{logout();setPage('staff');}}>Return to admin sign in</button>}</div></main></Shell>;
 }
 function Admin({token,logout,setPage}) {
   const [students,setStudents]=useState([]),[search,setSearch]=useState(''),[payment,setPayment]=useState(''),[event,setEvent]=useState(''),[message,setMessage]=useState(null);
@@ -148,5 +107,5 @@ function Scanner({token,logout,setPage}) {
   return <Shell staff page="staff" setPage={setPage}><main className="scanner-page"><div className="scanner-head"><div><span>ADMINISTRATOR</span><h1>Gate scanner</h1></div><button className="secondary" onClick={logout}>Sign out</button></div><div className="scanner-grid"><section className="camera"><div id="gate-reader"/><p>{readerReady?'Camera ready — align the QR code':'Allow camera access to begin scanning.'}</p></section><section className="result-panel"><span className="status-kicker">LATEST SCAN</span>{pinResult?<div className={`gate-result ${pinResult.ok?'allowed':'denied'}`}>{pinResult.ok?<CheckCircle2/>:<XCircle/>}<h2>{pinResult.title}</h2>{pinResult.detail&&<p>{pinResult.detail}</p>}</div>:<div className="gate-result idle"><QrCode/><h2>Awaiting pass</h2><p>Scan a student’s secure QR code.</p></div>}<form onSubmit={manualVerify}><label>Manual pass token<input value={manual} onChange={e=>setManual(e.target.value)} placeholder="Pass token or verification URL"/></label><button className="primary full" disabled={!roleReady}>Verify pass</button></form></section></div></main></Shell>;
 }
 
-function App(){const [page,setPage]=useState(location.hash.slice(1).split('?')[0]||'home');useEffect(()=>{const update=()=>setPage(location.hash.slice(1).split('?')[0]||'home');window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);const go=(next)=>{location.hash=next;setPage(next);};if(['staff','scanner','change-password','forgot-password','reset-password'].includes(page))return<Staff setPage={go}/>;if(page==='register')return<Shell page={page} setPage={go}><Register setPage={go}/></Shell>;if(page==='mypass')return<Shell page={page} setPage={go}><MyPass/></Shell>;return<Shell page={page} setPage={go}><Home setPage={go}/></Shell>;}
+function App(){const [page,setPage]=useState(location.hash.slice(1).split('?')[0]||'home');useEffect(()=>{const update=()=>setPage(location.hash.slice(1).split('?')[0]||'home');window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);const go=(next)=>{location.hash=next;setPage(next);};if(['staff','scanner','change-password','forgot-password'].includes(page))return<Staff setPage={go}/>;if(page==='register')return<Shell page={page} setPage={go}><Register setPage={go}/></Shell>;if(page==='mypass')return<Shell page={page} setPage={go}><MyPass/></Shell>;return<Shell page={page} setPage={go}><Home setPage={go}/></Shell>;}
 createRoot(document.getElementById('root')).render(<App/>);

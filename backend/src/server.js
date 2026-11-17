@@ -11,9 +11,16 @@ import gateRoutes from './routes/gate.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 5000;
+const localOrigins = process.env.NODE_ENV === 'production'
+  ? []
+  : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const allowedOrigins = [
+  ...(process.env.CLIENT_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean),
+  ...localOrigins,
+];
 app.disable('x-powered-by');
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-origin' } }));
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173', methods: ['GET', 'POST'] }));
+app.use(cors({ origin: [...new Set(allowedOrigins)], methods: ['GET', 'POST'] }));
 app.use(express.json({ limit: '32kb' }));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.get('/api/events', (_req, res) => res.json({

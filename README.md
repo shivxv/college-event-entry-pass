@@ -122,25 +122,14 @@ VITE_API_URL=https://api.example.edu
 The bootstrap endpoint is protected by `BOOTSTRAP_ADMIN_TOKEN` and can create the one allowed admin account. Call it once:
 
 ```powershell
-Invoke-RestMethod -Uri http://localhost:5000/api/auth/bootstrap-admin -Method Post -ContentType 'application/json' -Body '{"bootstrapToken":"YOUR_BOOTSTRAP_ADMIN_TOKEN","username":"admin","email":"admin@example.com","password":"a-long-private-password"}'
+Invoke-RestMethod -Uri http://localhost:5000/api/auth/bootstrap-admin -Method Post -ContentType 'application/json' -Body '{"bootstrapToken":"YOUR_BOOTSTRAP_ADMIN_TOKEN","username":"admin","password":"a-long-private-password"}'
 ```
 
-Use the administrator's name as the username, a working recovery email address, and a password of at least 12 characters. Remove the bootstrap token setting after creating the account.
+Use the administrator's name as the username and a password of at least 12 characters. Remove the bootstrap token setting after creating the account.
 
-Then sign in through **Staff access** in the website. Only this administrator account can sign in. The administrator can update the recovery email and change the password while signed in.
+Then sign in through **Staff access** in the website. Only this administrator account can sign in.
 
-Configure these private variables in Render to enable administrator password-reset emails:
-
-```dotenv
-SMTP_HOST=
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
-```
-
-Use the SMTP credentials issued by your email provider. Keep them private and configure them in Render's environment settings, not in source control. The administrator can select **Forgot password?** on the login screen and receive a single-use reset link at the account's recovery email. Until SMTP is configured, password resets are unavailable.
+Manual password recovery uses a separate private token. Set `ADMIN_RECOVERY_TOKEN` in Render to a strong random value of at least 32 characters; do not share or reuse the bootstrap token. If the administrator forgets the password, select **Forgot password?**, then enter the admin username, recovery token, and new password. Recovery attempts are rate-limited. Changing or resetting a password invalidates existing admin sessions.
 
 The signed-in administrator can choose **Change password** from the navigation. The current password is required, and the new password must be at least 12 characters.
 
@@ -168,9 +157,7 @@ The signed-in administrator can choose **Change password** from the navigation. 
 - `POST /api/passes/my-pass` — public paid-pass lookup
 - `POST /api/auth/login` — administrator JWT login
 - `POST /api/auth/change-password` — change the administrator password
-- `POST /api/auth/email` — update the administrator recovery email
-- `POST /api/auth/forgot-password` — request a password-reset email
-- `POST /api/auth/reset-password` — set a password using a single-use reset token
+- `POST /api/auth/forgot-password` — reset the administrator password using the private manual recovery token
 - `POST /api/auth/bootstrap-admin` — one-time initial admin creation
 - `GET /api/admin/students` — authenticated admin registration list/search/filter
 - `POST /api/admin/students/approve-payment` — authenticated offline payment approval
