@@ -122,12 +122,25 @@ VITE_API_URL=https://api.example.edu
 The bootstrap endpoint is protected by `BOOTSTRAP_ADMIN_TOKEN` and can create the one allowed admin account. Call it once:
 
 ```powershell
-Invoke-RestMethod -Uri http://localhost:5000/api/auth/bootstrap-admin -Method Post -ContentType 'application/json' -Body '{"bootstrapToken":"YOUR_BOOTSTRAP_ADMIN_TOKEN","username":"admin","password":"a-long-private-password"}'
+Invoke-RestMethod -Uri http://localhost:5000/api/auth/bootstrap-admin -Method Post -ContentType 'application/json' -Body '{"bootstrapToken":"YOUR_BOOTSTRAP_ADMIN_TOKEN","username":"admin","email":"admin@example.com","password":"a-long-private-password"}'
 ```
 
-The username may contain letters, numbers, dots, underscores, and hyphens. Passwords must be at least 12 characters. Remove the bootstrap token setting after this succeeds.
+The username may contain letters, numbers, spaces, dots, underscores, and hyphens. Provide a working staff email address and a password of at least 12 characters. Remove the bootstrap token setting after this succeeds.
 
-Then sign in through **Staff access** in the website. Admin accounts can create volunteer accounts with `POST /api/admin/volunteers` or extend the dashboard with that account-management action. Volunteers sign in through the same staff login.
+Then sign in through **Staff access** in the website. Admins can invite staff from the dashboard by name and email; each staff member receives a link to choose their own password. Staff can update their recovery email and change their password while signed in.
+
+Configure these private variables in Render to enable invitations and password-reset emails:
+
+```dotenv
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+```
+
+Use the SMTP credentials issued by your email provider. Keep them private and configure them in Render's environment settings, not in source control. Staff can select **Forgot password?** on the login screen and receive a single-use reset link at their registered email. Until SMTP is configured, password resets and staff invitations are unavailable.
 
 Signed-in staff can choose **Change password** from the staff navigation. The current password is required, and the new password must be at least 12 characters.
 
@@ -155,6 +168,9 @@ Signed-in staff can choose **Change password** from the staff navigation. The cu
 - `POST /api/passes/my-pass` — public paid-pass lookup
 - `POST /api/auth/login` — admin or volunteer JWT login
 - `POST /api/auth/change-password` — change the authenticated staff member's password
+- `POST /api/auth/email` — update the authenticated staff member's recovery email
+- `POST /api/auth/forgot-password` — request a password-reset email
+- `POST /api/auth/reset-password` — set a password using a single-use reset token
 - `POST /api/auth/bootstrap-admin` — one-time initial admin creation
 - `GET /api/admin/students` — authenticated admin registration list/search/filter
 - `POST /api/admin/students/approve-payment` — authenticated offline payment approval

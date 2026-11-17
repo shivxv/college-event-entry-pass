@@ -11,7 +11,7 @@ export function getJwtSecret() {
 
 export function signStaffToken(user) {
   return jwt.sign(
-    { role: user.role },
+    { role: user.role, ver: user.tokenVersion ?? 0 },
     getJwtSecret(),
     { algorithm: 'HS256', subject: user.id, issuer: 'campus-gather-api', audience: 'campus-gather-staff', expiresIn: '8h' },
   );
@@ -37,11 +37,11 @@ export async function requireStaff(req, res, next) {
   }
 
   try {
-    const user = await StaffUser.findById(payload.sub).select('_id username role active');
-    if (!user || !user.active || user.role !== payload.role) {
+    const user = await StaffUser.findById(payload.sub).select('_id username role active tokenVersion');
+    if (!user || !user.active || user.role !== payload.role || (payload.ver ?? 0) !== (user.tokenVersion ?? 0)) {
       return res.status(401).json({ message: 'The staff session is invalid or expired.' });
     }
-    req.staff = { id: user.id, username: user.username, role: user.role };
+    req.staff = { id: user.id, username: user.username, role: user.role, tokenVersion: user.tokenVersion };
     return next();
   } catch (error) {
     return next(error);

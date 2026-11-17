@@ -1,10 +1,11 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import StaffUser from '../models/StaffUser.js';
 import Student from '../models/Student.js';
 import { requireAdmin, requireStaff } from '../middleware/staffAuth.js';
+import { sendStaffPasswordEmail } from '../services/mailer.js';
 
 const router = Router();
 const accountLimiter = rateLimit({
@@ -18,21 +19,44 @@ router.use(requireStaff, requireAdmin);
 
 router.post('/volunteers', accountLimiter, async (req, res, next) => {
   try {
-    const { username, password } = req.body ?? {};
-    if (!hasOnlyKeys(req.body, ['username', 'password'])) {
-      return res.status(400).json({ message: 'Provide only a username and password.' });
+    const { username, email } = req.body ?? {};
+    if (!hasOnlyKeys(req.body, ['username', 'email'])) {
+      return res.status(400).json({ message: 'Provide only the staff name and email address.' });
     }
-    if (!validUsername(username) || !validPassword(password)) {
-      return res.status(400).json({ message: 'Provide a valid username and password (at least 12 characters).' });
+    if (!validUsername(username) || !validEmail(email)) {
+      return res.status(400).json({ message: 'Provide a valid staff name and email address.' });
     }
 
+    const token = randomBytes(32).toString('hex');
     const volunteer = await StaffUser.create({
-      username: username.trim().toLowerCase(),
-      passwordHash: await bcrypt.hash(password, 12),
+      username: normalizeUsername(username),
+      email: normalizeEmail(email),
+      passwordHash: await bcrypt.hash(randomBytes(32).toString('hex'), 12),
+      passwordResetTokenHash: hashResetToken(token),
+      passwordResetExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       role: 'volunteer',
     });
+    const origin = process.env.CLIENT_ORIGIN;
+    if (!origin) {
+      await StaffUser.deleteOne({ _id: volunteer._id });
+      return res.status(503).json({ message: 'Staff invitation email is not configured.' });
+    }
+    const resetUrl = new URL('/', origin);
+    resetUrl.hash = `reset-password?token=${token}`;
+    try {
+      await sendStaffPasswordEmail({
+        to: volunteer.email,
+        username: volunteer.username,
+        resetUrl: resetUrl.toString(),
+        purpose: 'invite',
+      });
+    } catch (error) {
+      await StaffUser.deleteOne({ _id: volunteer._id });
+      throw error;
+    }
     return res.status(201).json({
-      volunteer: { username: volunteer.username, role: volunteer.role, active: volunteer.active },
+      volunteer: { username: volunteer.username, email: volunteer.email, role: volunteer.role, active: volunteer.active },
+      message: 'Staff invitation sent. They can choose a password from the email link.',
     });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ message: 'That username is already in use.' });
@@ -118,11 +142,23 @@ router.post('/students/approve-payment', async (req, res, next) => {
 });
 
 function validUsername(value) {
-  return typeof value === 'string' && /^[a-zA-Z0-9._-]{3,32}$/.test(value.trim());
+  return typeof value === 'string' && /^[\p{L}\p{N}._' -]{3,64}$/u.test(value.trim());
 }
 
-function validPassword(value) {
-  return typeof value === 'string' && value.length >= 12 && Buffer.byteLength(value, 'utf8') <= 72;
+function validEmail(value) {
+  return typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function normalizeUsername(value) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function normalizeEmail(value) {
+  return value.trim().toLowerCase();
+}
+
+function hashResetToken(token) {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 function hasOnlyKeys(body, expectedKeys) {
