@@ -84,4 +84,10 @@ router.post('/students/approve-payment', async (req, res, next) => {
   }
 });
 
+function hasOnlyKeys(body, expectedKeys) {
+  return body !== null && typeof body === 'object' && !Array.isArray(body) &&
+    Object.keys(body).length === expectedKeys.length &&
+    Object.keys(body).every((key) => expectedKeys.includes(key));
+}
+
 export default router;
